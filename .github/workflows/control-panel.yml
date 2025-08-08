@@ -35,8 +35,8 @@ jobs:
             echo "{\"activeUntil\":\"$(date -u -d '1 second ago' -Iseconds)\", \"interval\":\"14\"}" > pinger-state.json
             COMMIT_MESSAGE="chore: Deactivate pinger"
           fi
-          git config --global user.name 'GitHub Actions'
-          git config --global user.email 'actions@github.com'
+          git config --global user.name 'Ankur Halder'
+          git config --global user.email 'ankur.halder12345@gmail.com'
           git add pinger-state.json
           git commit -m "$COMMIT_MESSAGE" || echo "No changes to commit"
           git push

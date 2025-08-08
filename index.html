@@ -13,12 +13,6 @@
       body {
         font-family: "Inter", sans-serif;
       }
-      .btn {
-        @apply w-full text-white font-bold py-3 px-4 rounded-lg transition-transform transform hover:scale-105 disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed;
-      }
-      .card {
-        @apply bg-white p-6 rounded-xl shadow-lg;
-      }
     </style>
   </head>
   <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
@@ -57,7 +51,7 @@
         </button>
       </div>
 
-      <div class="card">
+      <div class="bg-white p-6 rounded-xl shadow-lg">
         <h2 class="font-bold text-lg mb-4">Live Status</h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div class="p-4 rounded-lg text-center" id="pingerStatusCard">
@@ -80,7 +74,7 @@
         </div>
       </div>
 
-      <div class="card">
+      <div class="bg-white p-6 rounded-xl shadow-lg">
         <h2 class="font-bold text-lg mb-4">Controls</h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
@@ -114,17 +108,20 @@
           </div>
           <button
             id="activateBtn"
-            class="btn bg-blue-500 hover:bg-blue-700 sm:col-span-2"
+            class="w-full text-white font-bold py-3 px-4 rounded-lg transition-transform transform hover:scale-105 disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed sm:col-span-2 bg-blue-500 hover:bg-blue-700"
           >
             Activate Pinger
           </button>
           <button
             id="deactivateBtn"
-            class="btn bg-yellow-500 hover:bg-yellow-600"
+            class="w-full text-white font-bold py-3 px-4 rounded-lg transition-transform transform hover:scale-105 disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed bg-yellow-500 hover:bg-yellow-600"
           >
             Deactivate Pinger
           </button>
-          <button id="wakeUpBtn" class="btn bg-green-500 hover:bg-green-600">
+          <button
+            id="wakeUpBtn"
+            class="w-full text-white font-bold py-3 px-4 rounded-lg transition-transform transform hover:scale-105 disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed bg-green-500 hover:bg-green-600"
+          >
             Wake Up API (Ping Once)
           </button>
         </div>
