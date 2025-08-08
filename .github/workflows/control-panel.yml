@@ -1,0 +1,42 @@
+name: API Control Panel
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action: activate-pinger or deactivate-pinger"
+        required: true
+        type: string
+      duration_hours:
+        description: "How many hours the pinger should be active"
+        required: false
+        default: "12"
+      interval_minutes:
+        description: "The ping interval in minutes"
+        required: false
+        default: "14"
+
+jobs:
+  control:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Update State and Config File
+        run: |
+          if [[ "${{ github.event.inputs.action }}" == "activate-pinger" ]]; then
+            DURATION="${{ github.event.inputs.duration_hours }} hours"
+            echo "Activating pinger for $DURATION at a ${{ github.event.inputs.interval_minutes }} minute interval..."
+            echo "{\"activeUntil\":\"$(date -u -d \"$DURATION\" -Iseconds)\", \"interval\":\"${{ github.event.inputs.interval_minutes }}\"}" > pinger-state.json
+            COMMIT_MESSAGE="chore: Activate pinger for ${{ github.event.inputs.duration_hours }} hours"
+          else
+            echo "Deactivating pinger..."
+            echo "{\"activeUntil\":\"$(date -u -d '1 second ago' -Iseconds)\", \"interval\":\"14\"}" > pinger-state.json
+            COMMIT_MESSAGE="chore: Deactivate pinger"
+          fi
+          git config --global user.name 'GitHub Actions'
+          git config --global user.email 'actions@github.com'
+          git add pinger-state.json
+          git commit -m "$COMMIT_MESSAGE" || echo "No changes to commit"
+          git push

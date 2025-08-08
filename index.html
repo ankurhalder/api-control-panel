@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>API Control Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Inter", sans-serif;
+      }
+      .btn {
+        @apply w-full text-white font-bold py-3 px-4 rounded-lg transition-transform transform hover:scale-105 disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed;
+      }
+      .card {
+        @apply bg-white p-6 rounded-xl shadow-lg;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+    <div
+      class="max-w-xl w-full mx-auto bg-white p-8 rounded-xl shadow-lg space-y-6"
+    >
+      <header>
+        <h1 class="text-2xl font-bold text-center text-gray-800">
+          Backend Control Panel
+        </h1>
+        <p class="text-center text-gray-500 text-sm mt-1">
+          Manage your Render instance
+        </p>
+      </header>
+
+      <div class="p-4 bg-yellow-100 text-yellow-800 rounded-lg text-sm">
+        <strong>Note:</strong> This panel requires a GitHub Personal Access
+        Token with `workflow` scope to function.
+      </div>
+
+      <div class="space-y-2">
+        <label for="pat" class="block text-sm font-medium text-gray-700"
+          >GitHub Personal Access Token (PAT)</label
+        >
+        <input
+          type="password"
+          id="pat"
+          placeholder="ghp_..."
+          class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+        />
+        <button
+          id="savePatBtn"
+          class="w-full mt-2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-md"
+        >
+          Save Token to Browser
+        </button>
+      </div>
+
+      <div class="card">
+        <h2 class="font-bold text-lg mb-4">Live Status</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="p-4 rounded-lg text-center" id="pingerStatusCard">
+            <div class="font-bold text-gray-500">Pinger Status</div>
+            <div id="pingerStatus" class="text-3xl font-semibold">UNKNOWN</div>
+            <div id="pingerCountdown" class="text-sm mt-1 text-gray-500">
+              Enter PAT to check
+            </div>
+          </div>
+          <div
+            class="p-4 rounded-lg text-center bg-gray-200"
+            id="serviceStatusCard"
+          >
+            <div class="font-bold text-gray-500">Render Service</div>
+            <div id="serviceStatus" class="text-3xl font-semibold">UNKNOWN</div>
+            <div id="serviceResponseTime" class="text-sm mt-1 text-gray-500">
+              Ping to check status
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="font-bold text-lg mb-4">Controls</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label
+              for="interval"
+              class="block text-sm font-medium text-gray-700 mb-1"
+              >Ping Interval</label
+            >
+            <select
+              id="interval"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md"
+            >
+              <option value="14">14 Minutes (Recommended)</option>
+              <option value="10">10 Minutes</option>
+              <option value="5">5 Minutes</option>
+            </select>
+          </div>
+          <div>
+            <label
+              for="duration"
+              class="block text-sm font-medium text-gray-700 mb-1"
+              >Duration (Hours)</label
+            >
+            <input
+              type="number"
+              id="duration"
+              value="12"
+              min="1"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md"
+            />
+          </div>
+          <button
+            id="activateBtn"
+            class="btn bg-blue-500 hover:bg-blue-700 sm:col-span-2"
+          >
+            Activate Pinger
+          </button>
+          <button
+            id="deactivateBtn"
+            class="btn bg-yellow-500 hover:bg-yellow-600"
+          >
+            Deactivate Pinger
+          </button>
+          <button id="wakeUpBtn" class="btn bg-green-500 hover:bg-green-600">
+            Wake Up API (Ping Once)
+          </button>
+        </div>
+      </div>
+
+      <div
+        id="feedback"
+        class="pt-4 text-center text-sm text-gray-600 h-5"
+      ></div>
+    </div>
+
+    <script>
+      const GITHUB_REPO = "ankurhalder/ankurhalder-backend";
+      const CONTROL_WORKFLOW_FILE = "control-panel.yml";
+      const RENDER_URL = "https://ankurhalder.onrender.com";
+
+      const patInput = document.getElementById("pat");
+      const savePatBtn = document.getElementById("savePatBtn");
+      const wakeUpBtn = document.getElementById("wakeUpBtn");
+      const activateBtn = document.getElementById("activateBtn");
+      const deactivateBtn = document.getElementById("deactivateBtn");
+      const intervalInput = document.getElementById("interval");
+      const durationInput = document.getElementById("duration");
+      const feedbackDiv = document.getElementById("feedback");
+      const pingerStatusCard = document.getElementById("pingerStatusCard");
+      const pingerStatusEl = document.getElementById("pingerStatus");
+      const pingerCountdownEl = document.getElementById("pingerCountdown");
+      const serviceStatusCard = document.getElementById("serviceStatusCard");
+      const serviceStatusEl = document.getElementById("serviceStatus");
+      const serviceResponseTimeEl = document.getElementById(
+        "serviceResponseTime"
+      );
+
+      let pingerCountdownInterval;
+
+      function getPat() {
+        return localStorage.getItem("github_pat");
+      }
+
+      function setFeedback(message, isError = false) {
+        feedbackDiv.textContent = message;
+        feedbackDiv.classList.toggle("text-red-500", isError);
+        feedbackDiv.classList.toggle("text-green-500", !isError);
+      }
+
+      async function triggerWorkflow(inputs) {
+        const token = getPat();
+        if (!token) {
+          alert("Please save your GitHub Personal Access Token first.");
+          return;
+        }
+        setFeedback("Triggering GitHub Action...", false);
+        try {
+          const response = await fetch(
+            `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/${CONTROL_WORKFLOW_FILE}/dispatches`,
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/vnd.github.v3+json",
+              },
+              body: JSON.stringify({ ref: "main", inputs }),
+            }
+          );
+          if (response.status === 204) {
+            setFeedback(
+              `Success! Action triggered. State will update shortly.`
+            );
+            setTimeout(checkPingerState, 8000);
+          } else {
+            const errorData = await response.json();
+            throw new Error(
+              errorData.message || `GitHub API returned ${response.status}`
+            );
+          }
+        } catch (error) {
+          setFeedback(`Error: ${error.message}`, true);
+        }
+      }
+
+      async function checkPingerState() {
+        const token = getPat();
+        if (!token) return;
+        try {
+          const res = await fetch(
+            `https://api.github.com/repos/${GITHUB_REPO}/contents/pinger-state.json?t=${new Date().getTime()}`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/vnd.github.v3+json",
+              },
+            }
+          );
+          if (!res.ok) throw new Error("Could not fetch pinger state file.");
+          const data = await res.json();
+          const content = JSON.parse(atob(data.content));
+          const activeUntil = new Date(content.activeUntil);
+          updatePingerStatusUI(activeUntil);
+        } catch (error) {
+          console.error(error);
+        }
+      }
+
+      function updatePingerStatusUI(activeUntil) {
+        clearInterval(pingerCountdownInterval);
+        const now = new Date();
+        if (activeUntil > now) {
+          pingerStatusEl.textContent = "ACTIVE";
+          pingerStatusCard.className =
+            "p-4 rounded-lg text-center bg-green-100 text-green-800";
+          pingerCountdownInterval = setInterval(() => {
+            const remaining = activeUntil - new Date();
+            if (remaining <= 0) {
+              clearInterval(pingerCountdownInterval);
+              updatePingerStatusUI(new Date(0));
+              return;
+            }
+            const hours = Math.floor(remaining / 3600000);
+            const minutes = Math.floor((remaining % 3600000) / 60000);
+            const seconds = Math.floor((remaining % 60000) / 1000);
+            pingerCountdownEl.textContent = `Deactivates in: ${hours}h ${minutes}m ${seconds}s`;
+          }, 1000);
+        } else {
+          pingerStatusEl.textContent = "INACTIVE";
+          pingerStatusCard.className =
+            "p-4 rounded-lg text-center bg-red-100 text-red-800";
+          pingerCountdownEl.textContent = "";
+        }
+      }
+
+      async function checkServiceStatus() {
+        serviceStatusEl.textContent = "Pinging...";
+        serviceResponseTimeEl.textContent = "";
+        serviceStatusCard.className =
+          "p-4 rounded-lg text-center bg-yellow-100 text-yellow-800";
+        const startTime = Date.now();
+        try {
+          const res = await fetch(RENDER_URL);
+          const responseTime = Date.now() - startTime;
+          if (!res.ok) throw new Error(`Status ${res.status}`);
+          serviceStatusEl.textContent = "AWAKE";
+          serviceStatusCard.className =
+            "p-4 rounded-lg text-center bg-green-100 text-green-800";
+          serviceResponseTimeEl.textContent = `Response: ${responseTime}ms`;
+        } catch (error) {
+          serviceStatusEl.textContent = "ASLEEP";
+          serviceStatusCard.className =
+            "p-4 rounded-lg text-center bg-gray-200 text-gray-800";
+          serviceResponseTimeEl.textContent = `(or starting up)`;
+        }
+      }
+
+      savePatBtn.addEventListener("click", () => {
+        localStorage.setItem("github_pat", patInput.value);
+        patInput.value = "";
+        alert("Token saved to browser local storage for this session.");
+        checkPingerState();
+      });
+
+      wakeUpBtn.addEventListener("click", () => {
+        checkServiceStatus();
+      });
+
+      activateBtn.addEventListener("click", () => {
+        triggerWorkflow({
+          action: "activate-pinger",
+          duration_hours: durationInput.value || "12",
+          interval_minutes: intervalInput.value || "14",
+        });
+      });
+
+      deactivateBtn.addEventListener("click", () => {
+        triggerWorkflow({ action: "deactivate-pinger" });
+      });
+
+      const storedPat = getPat();
+      if (storedPat) {
+        patInput.value = storedPat;
+        checkPingerState();
+      }
+      checkServiceStatus();
+    </script>
+  </body>
+</html>
