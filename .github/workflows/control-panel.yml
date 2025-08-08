@@ -19,13 +19,12 @@ on:
 jobs:
   control:
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: write
     steps:
       - name: Checkout repository for state change
         if: ${{ github.event.inputs.action != 'wake-up' }}
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT }}
 
       - name: Activate Pinger
         if: ${{ github.event.inputs.action == 'activate-pinger' }}
@@ -40,7 +39,6 @@ jobs:
         if: ${{ github.event.inputs.action == 'deactivate-pinger' }}
         run: |
           echo "Deactivating pinger..."
-          # Retain the last interval setting for user convenience
           INTERVAL=$(jq -r .interval pinger-state.json || echo "14")
           echo "{\"activeUntil\":\"$(date -u -d '1 second ago' -Iseconds)\", \"interval\":\"$INTERVAL\"}" > pinger-state.json
           echo "COMMIT_MESSAGE=chore: Deactivate pinger" >> $GITHUB_ENV
@@ -51,7 +49,6 @@ jobs:
           git config --global user.name 'Ankur Halder'
           git config --global user.email 'ankur.halder12345@gmail.com'
           git add pinger-state.json
-          # Commit only if there are changes
           if ! git diff --staged --quiet; then
             git commit -m "${{ env.COMMIT_MESSAGE }}"
             git push
