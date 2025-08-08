@@ -2,7 +2,7 @@ name: Smart Keep-Alive for Render
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "*/14 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -10,29 +10,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Check pinger state
         id: check_state
         run: |
+          # Read the 'activeUntil' timestamp from the state file
           active_until=$(jq -r .activeUntil pinger-state.json)
+
+          # Get the current time in the same ISO 8601 format
           current_time=$(date -u -Iseconds)
 
+          echo "Pinger active until: $active_until"
+          echo "Current time is:     $current_time"
+
+          # Compare the timestamps and set the output variable for the next step
           if [[ "$current_time" < "$active_until" ]]; then
             echo "should_ping=true" >> $GITHUB_OUTPUT
-            # We must also re-schedule the workflow dynamically based on the interval
-            interval=$(jq -r .interval pinger-state.json)
-            echo "Setting new cron interval to */${interval}..."
-            sed -i "s/cron: '.\+\_'/cron: '*/${interval} * * * *'/" .github/workflows/keep-alive.yml
-            
-            # Check if changes were made to the workflow file
-            if ! git diff --quiet .github/workflows/keep-alive.yml; then
-              git config --global user.name 'GitHub Actions'
-              git config --global user.email 'actions@github.com'
-              git add .github/workflows/keep-alive.yml
-              git commit -m "chore: Adjust pinger interval to ${interval} minutes"
-              git push
-            fi
           else
             echo "should_ping=false" >> $GITHUB_OUTPUT
           fi

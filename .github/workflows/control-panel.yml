@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: "Action: activate-pinger or deactivate-pinger"
+        description: "Action: wake-up, activate-pinger, or deactivate-pinger"
         required: true
         type: string
       duration_hours:
@@ -20,32 +20,45 @@ jobs:
   control:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        if: ${{ github.event.inputs.action != 'wake-up' }}
-        uses: actions/checkout@v3
-
-      - name: Update State and Config File
-        if: ${{ github.event.inputs.action != 'wake-up' }}
-        run: |
-          if [[ "${{ github.event.inputs.action }}" == "activate-pinger" ]]; then
-            DURATION="${{ github.event.inputs.duration_hours }} hours"
-            echo "Activating pinger for $DURATION at a ${{ github.event.inputs.interval_minutes }} minute interval..."
-            echo "{\"activeUntil\":\"$(date -u -d \"$DURATION\" -Iseconds)\", \"interval\":\"${{ github.event.inputs.interval_minutes }}\"}" > pinger-state.json
-            COMMIT_MESSAGE="chore: Activate pinger for ${{ github.event.inputs.duration_hours }} hours"
-          else
-            echo "Deactivating pinger..."
-            echo "{\"activeUntil\":\"$(date -u -d '1 second ago' -Iseconds)\", \"interval\":\"14\"}" > pinger-state.json
-            COMMIT_MESSAGE="chore: Deactivate pinger"
-          fi
-          git config --global user.name 'GitHub Actions'
-          git config --global user.email 'actions@github.com'
-          git add pinger-state.json
-          git commit -m "$COMMIT_MESSAGE" || echo "No changes to commit"
-          git push
-
-      - name: Wake Up API
+      - name: Wake Up API (Ping Once)
         if: ${{ github.event.inputs.action == 'wake-up' }}
         run: |
           echo "Pinging Render service once to wake it up..."
           curl -s "https://ankurhalder.onrender.com"
           echo "Ping complete."
+
+      - name: Checkout repository for state change
+        if: ${{ github.event.inputs.action != 'wake-up' }}
+        uses: actions/checkout@v4
+
+      - name: Activate Pinger
+        if: ${{ github.event.inputs.action == 'activate-pinger' }}
+        run: |
+          DURATION="${{ github.event.inputs.duration_hours }} hours"
+          INTERVAL="${{ github.event.inputs.interval_minutes }}"
+          echo "Activating pinger for $DURATION at a $INTERVAL minute interval..."
+          echo "{\"activeUntil\":\"$(date -u -d \"$DURATION\" -Iseconds)\", \"interval\":\"$INTERVAL\"}" > pinger-state.json
+          echo "COMMIT_MESSAGE=chore: Activate pinger for ${{ github.event.inputs.duration_hours }} hours" >> $GITHUB_ENV
+
+      - name: Deactivate Pinger
+        if: ${{ github.event.inputs.action == 'deactivate-pinger' }}
+        run: |
+          echo "Deactivating pinger..."
+          # Retain the last interval setting for user convenience
+          INTERVAL=$(jq -r .interval pinger-state.json || echo "14")
+          echo "{\"activeUntil\":\"$(date -u -d '1 second ago' -Iseconds)\", \"interval\":\"$INTERVAL\"}" > pinger-state.json
+          echo "COMMIT_MESSAGE=chore: Deactivate pinger" >> $GITHUB_ENV
+
+      - name: Commit and Push State Change
+        if: ${{ github.event.inputs.action == 'activate-pinger' || github.event.inputs.action == 'deactivate-pinger' }}
+        run: |
+          git config --global user.name 'Ankur Halder'
+          git config --global user.email 'ankur.halder12345@gmail.com'
+          git add pinger-state.json
+          # Commit only if there are changes
+          if ! git diff --staged --quiet; then
+            git commit -m "${{ env.COMMIT_MESSAGE }}"
+            git push
+          else
+            echo "No changes to commit."
+          fi

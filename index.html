@@ -14,14 +14,16 @@
         font-family: "Inter", sans-serif;
         scroll-behavior: smooth;
       }
-      .btn {
-        @apply w-full text-white font-bold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed;
-      }
-      .card {
-        @apply bg-white p-6 rounded-xl shadow-lg;
-      }
       .spinner {
-        @apply animate-spin -ml-1 mr-3 h-5 w-5 text-white;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
       }
       .hidden {
         display: none;
@@ -36,7 +38,7 @@
         <p id="panel-subtitle" class="text-gray-500 mt-1"></p>
       </header>
 
-      <div id="config-view" class="card">
+      <div id="config-view" class="bg-white p-6 rounded-xl shadow-lg">
         <h2 class="font-bold text-lg mb-4 text-center">Initial Setup</h2>
         <div class="p-4 bg-yellow-100 text-yellow-800 rounded-lg text-sm">
           <strong>Action Required:</strong> To control your backend, this panel
@@ -62,7 +64,7 @@
       </div>
 
       <div id="dashboard-view" class="hidden space-y-6">
-        <div class="card">
+        <div class="bg-white p-6 rounded-xl shadow-lg">
           <h2 class="font-bold text-lg mb-4">Live Status</h2>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div class="p-4 rounded-lg text-center" id="pingerStatusCard">
@@ -91,7 +93,7 @@
           </div>
         </div>
 
-        <div class="card">
+        <div class="bg-white p-6 rounded-xl shadow-lg">
           <h2 class="font-bold text-lg mb-4">Pinger Controls</h2>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -121,22 +123,22 @@
             <div class="sm:col-span-2">
               <button
                 id="activateBtn"
-                class="btn bg-blue-500 hover:bg-blue-700 flex items-center justify-center"
+                class="w-full text-white font-bold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed flex items-center justify-center bg-blue-500 hover:bg-blue-700"
               ></button>
             </div>
           </div>
         </div>
 
-        <div class="card">
+        <div class="bg-white p-6 rounded-xl shadow-lg">
           <h2 class="font-bold text-lg mb-4">Manual Actions</h2>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <button
               id="deactivateBtn"
-              class="btn bg-yellow-500 hover:bg-yellow-600 flex items-center justify-center"
+              class="w-full text-white font-bold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed flex items-center justify-center bg-yellow-500 hover:bg-yellow-600"
             ></button>
             <button
               id="wakeUpBtn"
-              class="btn bg-green-500 hover:bg-green-600 flex items-center justify-center"
+              class="w-full text-white font-bold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed flex items-center justify-center bg-green-500 hover:bg-green-600"
             ></button>
           </div>
         </div>
@@ -191,7 +193,7 @@
       const setButtonLoading = (button, isLoading, text) => {
         button.disabled = isLoading;
         if (isLoading) {
-          button.innerHTML = `<div class="spinner"></div> ${text}`;
+          button.innerHTML = `<div class="-ml-1 mr-3 h-5 w-5 border-2 border-white border-t-transparent rounded-full spinner"></div> ${text}`;
         } else {
           button.innerHTML = text;
         }
@@ -202,14 +204,10 @@
         if (!token)
           return alert("Please save your GitHub Personal Access Token first.");
 
-        const buttonText =
-          inputs.action === "activate-pinger"
-            ? "Activate Pinger"
-            : "Deactivate Pinger";
-        const button =
-          inputs.action === "activate-pinger"
-            ? dom.activateBtn
-            : dom.deactivateBtn;
+        const isActivate = inputs.action === "activate-pinger";
+        const button = isActivate ? dom.activateBtn : dom.deactivateBtn;
+        const buttonText = isActivate ? "Activate Pinger" : "Deactivate Pinger";
+
         setButtonLoading(button, true, "Triggering...");
         setFeedback("Triggering GitHub Action...", false);
 
@@ -298,7 +296,6 @@
       const checkServiceStatus = async () => {
         try {
           const res = await fetch(config.serviceURL);
-          const responseTime = "N/A";
           if (!res.ok) throw new Error(`Status ${res.status}`);
           dom.serviceStatus.textContent = "AWAKE";
           dom.serviceStatusCard.className =
@@ -351,9 +348,9 @@
           .join("");
         dom.intervalInput.value = config.defaultPingInterval;
 
-        dom.activateBtn.innerHTML = "Activate Pinger";
-        dom.deactivateBtn.innerHTML = "Deactivate Pinger";
-        dom.wakeUpBtn.innerHTML = "Wake Up API (Ping Once)";
+        setButtonLoading(dom.activateBtn, false, "Activate Pinger");
+        setButtonLoading(dom.deactivateBtn, false, "Deactivate Pinger");
+        setButtonLoading(dom.wakeUpBtn, false, "Wake Up API (Ping Once)");
 
         const storedPat = getPat();
         if (storedPat) {
