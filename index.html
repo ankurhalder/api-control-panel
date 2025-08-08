@@ -20,12 +20,14 @@
       class="max-w-xl w-full mx-auto bg-white p-8 rounded-xl shadow-lg space-y-6"
     >
       <header>
-        <h1 class="text-2xl font-bold text-center text-gray-800">
-          Backend Control Panel
-        </h1>
-        <p class="text-center text-gray-500 text-sm mt-1">
-          Manage your Render instance
-        </p>
+        <h1
+          id="panel-title"
+          class="text-2xl font-bold text-center text-gray-800"
+        ></h1>
+        <p
+          id="panel-subtitle"
+          class="text-center text-gray-500 text-sm mt-1"
+        ></p>
       </header>
 
       <div class="p-4 bg-yellow-100 text-yellow-800 rounded-lg text-sm">
@@ -65,7 +67,7 @@
             class="p-4 rounded-lg text-center bg-gray-200"
             id="serviceStatusCard"
           >
-            <div class="font-bold text-gray-500">Render Service</div>
+            <div class="font-bold text-gray-500">Remote Service</div>
             <div id="serviceStatus" class="text-3xl font-semibold">UNKNOWN</div>
             <div id="serviceResponseTime" class="text-sm mt-1 text-gray-500">
               Ping to check status
@@ -134,9 +136,24 @@
     </div>
 
     <script>
-      const GITHUB_REPO = "ankurhalder/ankurhalder-backend";
-      const CONTROL_WORKFLOW_FILE = "control-panel.yml";
-      const RENDER_URL = "https://ankurhalder.onrender.com";
+      const config = {
+        // The GitHub repository for your BACKEND service (the one with the workflows).
+        githubRepo: "ankurhalder/ankurhalder-backend",
+
+        // The public URL of the backend service you want to keep alive.
+        serviceURL: "https://ankurhalder.onrender.com",
+
+        // The filename of the workflow that the control panel triggers.
+        controlWorkflowFile: "control-panel.yml",
+
+        // --- UI Text ---
+        title: "Backend Control Panel",
+        subtitle: "Manage your Render instance",
+
+        // --- Default Control Values ---
+        defaultPingInterval: 14, // in minutes
+        defaultActivationDuration: 12, // in hours
+      };
 
       const patInput = document.getElementById("pat");
       const savePatBtn = document.getElementById("savePatBtn");
@@ -176,7 +193,7 @@
         setFeedback("Triggering GitHub Action...", false);
         try {
           const response = await fetch(
-            `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/${CONTROL_WORKFLOW_FILE}/dispatches`,
+            `https://api.github.com/repos/${config.githubRepo}/actions/workflows/${config.controlWorkflowFile}/dispatches`,
             {
               method: "POST",
               headers: {
@@ -207,7 +224,9 @@
         if (!token) return;
         try {
           const res = await fetch(
-            `https://api.github.com/repos/${GITHUB_REPO}/contents/pinger-state.json?t=${new Date().getTime()}`,
+            `https://api.github.com/repos/${
+              config.githubRepo
+            }/contents/pinger-state.json?t=${new Date().getTime()}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -259,7 +278,7 @@
           "p-4 rounded-lg text-center bg-yellow-100 text-yellow-800";
         const startTime = Date.now();
         try {
-          const res = await fetch(RENDER_URL);
+          const res = await fetch(config.serviceURL);
           const responseTime = Date.now() - startTime;
           if (!res.ok) throw new Error(`Status ${res.status}`);
           serviceStatusEl.textContent = "AWAKE";
@@ -274,6 +293,14 @@
         }
       }
 
+      function initializeUI() {
+        document.getElementById("panel-title").textContent = config.title;
+        document.getElementById("panel-subtitle").textContent = config.subtitle;
+        intervalInput.value = config.defaultPingInterval;
+        durationInput.value = config.defaultActivationDuration;
+      }
+
+      // --- Event Listeners ---
       savePatBtn.addEventListener("click", () => {
         localStorage.setItem("github_pat", patInput.value);
         patInput.value = "";
@@ -281,15 +308,13 @@
         checkPingerState();
       });
 
-      wakeUpBtn.addEventListener("click", () => {
-        checkServiceStatus();
-      });
+      wakeUpBtn.addEventListener("click", () => checkServiceStatus());
 
       activateBtn.addEventListener("click", () => {
         triggerWorkflow({
           action: "activate-pinger",
-          duration_hours: durationInput.value || "12",
-          interval_minutes: intervalInput.value || "14",
+          duration_hours: durationInput.value,
+          interval_minutes: intervalInput.value,
         });
       });
 
@@ -297,6 +322,8 @@
         triggerWorkflow({ action: "deactivate-pinger" });
       });
 
+      // --- Initial Load ---
+      initializeUI();
       const storedPat = getPat();
       if (storedPat) {
         patInput.value = storedPat;
