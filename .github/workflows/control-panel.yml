@@ -19,14 +19,10 @@ on:
 jobs:
   control:
     runs-on: ubuntu-latest
-    steps:
-      - name: Wake Up API (Ping Once)
-        if: ${{ github.event.inputs.action == 'wake-up' }}
-        run: |
-          echo "Pinging Render service once to wake it up..."
-          curl -s "https://ankurhalder.onrender.com"
-          echo "Ping complete."
 
+    permissions:
+      contents: write
+    steps:
       - name: Checkout repository for state change
         if: ${{ github.event.inputs.action != 'wake-up' }}
         uses: actions/checkout@v4
@@ -62,3 +58,10 @@ jobs:
           else
             echo "No changes to commit."
           fi
+
+      - name: Wake Up API (Ping Once)
+        if: ${{ github.event.inputs.action == 'wake-up' }}
+        run: |
+          echo "Pinging Render service once to wake it up..."
+          curl -s "https://ankurhalder.onrender.com"
+          echo "Ping complete."
