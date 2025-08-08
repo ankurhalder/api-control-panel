@@ -19,12 +19,12 @@ on:
 jobs:
   control:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
-      - name: Checkout repository for state change
-        if: ${{ github.event.inputs.action != 'wake-up' }}
+      - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GH_PAT }}
 
       - name: Activate Pinger
         if: ${{ github.event.inputs.action == 'activate-pinger' }}
@@ -45,19 +45,10 @@ jobs:
 
       - name: Commit and Push State Change
         if: ${{ github.event.inputs.action == 'activate-pinger' || github.event.inputs.action == 'deactivate-pinger' }}
-        run: |
-          git config --global user.name 'Ankur Halder'
-          git config --global user.email 'ankur.halder12345@gmail.com'
-          git add pinger-state.json
-
-
-          if ! git diff --staged --quiet; then
-            git commit -m "${{ env.COMMIT_MESSAGE }}"
-            # Use the PAT to push the commit
-            git push https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.git HEAD:main
-          else
-            echo "No changes to commit."
-          fi
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: ${{ env.COMMIT_MESSAGE }}
+          file_pattern: pinger-state.json
 
       - name: Wake Up API (Ping Once)
         if: ${{ github.event.inputs.action == 'wake-up' }}
