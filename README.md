@@ -17,7 +17,7 @@ _This tool uses GitHub Actions to give you on-demand control over your service's
 
 ## 📸 Dashboard Preview
 
-![Dashboard Screenshot](https://i.imgur.com/your-screenshot-url.png)
+![Dashboard Screenshot](./public/dashboard.png)
 
 ---
 
