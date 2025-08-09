@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: "Action: wake-up, activate-pinger, or deactivate-pinger"
+        description: "Action: activate-pinger, or deactivate-pinger"
         required: true
         type: string
       duration_hours:
@@ -39,7 +39,8 @@ jobs:
         if: ${{ github.event.inputs.action == 'deactivate-pinger' }}
         run: |
           echo "Deactivating pinger..."
-          INTERVAL=$(jq -r .interval pinger-state.json || echo "14")
+          # Use the last known interval or a default if the file doesn't exist/is malformed
+          INTERVAL=$(jq -r .interval pinger-state.json 2>/dev/null || echo "14")
           echo "{\"activeUntil\":\"$(date -u -d '1 second ago' -Iseconds)\", \"interval\":\"$INTERVAL\"}" > pinger-state.json
           echo "COMMIT_MESSAGE=chore: Deactivate pinger" >> $GITHUB_ENV
 
@@ -49,10 +50,3 @@ jobs:
         with:
           commit_message: ${{ env.COMMIT_MESSAGE }}
           file_pattern: pinger-state.json
-
-      - name: Wake Up API (Ping Once)
-        if: ${{ github.event.inputs.action == 'wake-up' }}
-        run: |
-          echo "Pinging Render service once to wake it up..."
-          curl -s "https://ankurhalder.onrender.com"
-          echo "Ping complete."
