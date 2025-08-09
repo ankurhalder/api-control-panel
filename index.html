@@ -181,13 +181,22 @@
 
       let pingerCountdownInterval;
       let wakeUpPollingInterval;
+      let statePollingInterval;
 
       const getPat = () => localStorage.getItem("github_pat");
 
-      const setFeedback = (message, isError = false) => {
+      const setFeedback = (message, isError = false, duration = 5000) => {
         dom.feedback.textContent = message;
-        dom.feedback.classList.toggle("text-red-500", isError);
-        dom.feedback.classList.toggle("text-green-500", !isError);
+        dom.feedback.className = `text-center text-sm h-5 ${
+          isError ? "text-red-500" : "text-green-600"
+        }`;
+        if (message) {
+          setTimeout(() => {
+            if (dom.feedback.textContent === message) {
+              dom.feedback.textContent = "";
+            }
+          }, duration);
+        }
       };
 
       const setButtonLoading = (button, isLoading, text) => {
@@ -209,7 +218,7 @@
         const buttonText = isActivate ? "Activate Pinger" : "Deactivate Pinger";
 
         setButtonLoading(button, true, "Triggering...");
-        setFeedback("Triggering GitHub Action...", false);
+        setFeedback("Triggering GitHub Action...");
 
         try {
           const response = await fetch(
@@ -220,14 +229,15 @@
                 Authorization: `Bearer ${token}`,
                 Accept: "application/vnd.github.v3+json",
               },
-              body: JSON.stringify({ ref: "main", inputs }),
+              body: JSON.stringify({
+                ref: "main",
+                inputs,
+              }),
             }
           );
           if (response.status === 204) {
-            setFeedback(
-              `Success! Action triggered. State will update shortly.`
-            );
-            setTimeout(checkPingerState, 8000);
+            setFeedback("Success! Action triggered. Verifying state update...");
+            pollForStateChange();
           } else {
             const errorData = await response.json();
             throw new Error(
@@ -241,9 +251,34 @@
         }
       };
 
+      const pollForStateChange = () => {
+        let attempts = 0;
+        const maxAttempts = 6;
+        clearInterval(statePollingInterval);
+
+        statePollingInterval = setInterval(async () => {
+          attempts++;
+          const success = await checkPingerState();
+          if (success) {
+            clearInterval(statePollingInterval);
+            setFeedback("State updated successfully!", false);
+          } else if (attempts >= maxAttempts) {
+            clearInterval(statePollingInterval);
+            setFeedback(
+              "Could not verify state change. Please check the Actions tab.",
+              true
+            );
+          } else {
+            setFeedback(
+              `Verifying state... (attempt ${attempts}/${maxAttempts})`
+            );
+          }
+        }, 5000);
+      };
+
       const checkPingerState = async () => {
         const token = getPat();
-        if (!token) return;
+        if (!token) return false;
         try {
           const res = await fetch(
             `https://api.github.com/repos/${
@@ -256,18 +291,35 @@
               },
             }
           );
-          if (!res.ok) throw new Error("Could not fetch pinger state file.");
+          if (!res.ok) {
+            if (res.status === 404) {
+              updatePingerStatusUI(new Date(0));
+              return true;
+            }
+            throw new Error("Could not fetch pinger state file.");
+          }
           const data = await res.json();
           const content = JSON.parse(atob(data.content));
           const activeUntil = new Date(content.activeUntil);
           updatePingerStatusUI(activeUntil);
+          return true;
         } catch (error) {
           console.error(error);
+          updatePingerStatusUI(null);
+          return false;
         }
       };
 
       const updatePingerStatusUI = (activeUntil) => {
         clearInterval(pingerCountdownInterval);
+        if (activeUntil === null) {
+          dom.pingerStatus.textContent = "UNKNOWN";
+          dom.pingerStatusCard.className =
+            "p-4 rounded-lg text-center bg-gray-200 text-gray-800";
+          dom.pingerCountdown.textContent = "";
+          return;
+        }
+
         const now = new Date();
         if (activeUntil > now) {
           dom.pingerStatus.textContent = "ACTIVE";
@@ -295,7 +347,9 @@
 
       const checkServiceStatus = async () => {
         try {
-          const res = await fetch(config.serviceURL);
+          const res = await fetch(
+            `${config.serviceURL}?t=${new Date().getTime()}`
+          );
           if (!res.ok) throw new Error(`Status ${res.status}`);
           dom.serviceStatus.textContent = "AWAKE";
           dom.serviceStatusCard.className =
@@ -322,21 +376,29 @@
         dom.serviceStatusCard.className =
           "p-4 rounded-lg text-center bg-yellow-100 text-yellow-800";
 
-        wakeUpPollingInterval = setInterval(async () => {
-          pollCount++;
+        const initialPing = async () => {
           const isAwake = await checkServiceStatus();
           if (isAwake) {
-            clearInterval(wakeUpPollingInterval);
             setButtonLoading(dom.wakeUpBtn, false, "Wake Up API (Ping Once)");
-          } else if (pollCount >= maxPolls) {
-            clearInterval(wakeUpPollingInterval);
-            setFeedback(
-              "Service did not respond in time. It might be having issues.",
-              true
-            );
-            setButtonLoading(dom.wakeUpBtn, false, "Wake Up API (Ping Once)");
+            return;
           }
-        }, 5000);
+          wakeUpPollingInterval = setInterval(async () => {
+            pollCount++;
+            const isAwake = await checkServiceStatus();
+            if (isAwake) {
+              clearInterval(wakeUpPollingInterval);
+              setButtonLoading(dom.wakeUpBtn, false, "Wake Up API (Ping Once)");
+            } else if (pollCount >= maxPolls) {
+              clearInterval(wakeUpPollingInterval);
+              setFeedback(
+                "Service did not respond in time. It might be having issues.",
+                true
+              );
+              setButtonLoading(dom.wakeUpBtn, false, "Wake Up API (Ping Once)");
+            }
+          }, 5000);
+        };
+        initialPing();
       };
 
       const initializeUI = () => {
@@ -385,7 +447,9 @@
       });
 
       dom.deactivateBtn.addEventListener("click", () => {
-        triggerWorkflow({ action: "deactivate-pinger" });
+        triggerWorkflow({
+          action: "deactivate-pinger",
+        });
       });
 
       initializeUI();
