@@ -15,16 +15,18 @@ jobs:
       - name: Check pinger state
         id: check_state
         run: |
-          # Read the 'activeUntil' timestamp from the state file
-          active_until=$(jq -r .activeUntil pinger-state.json)
+          if [[ ! -f pinger-state.json ]]; then
+            echo "State file not found. Assuming pinger is inactive."
+            echo "should_ping=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
 
-          # Get the current time in the same ISO 8601 format
+          active_until=$(jq -r .activeUntil pinger-state.json)
           current_time=$(date -u -Iseconds)
 
           echo "Pinger active until: $active_until"
           echo "Current time is:     $current_time"
 
-          # Compare the timestamps and set the output variable for the next step
           if [[ "$current_time" < "$active_until" ]]; then
             echo "should_ping=true" >> $GITHUB_OUTPUT
           else
@@ -35,7 +37,7 @@ jobs:
         if: steps.check_state.outputs.should_ping == 'true'
         run: |
           echo "Pinger is active. Pinging Render service..."
-          curl -s "https://ankurhalder.onrender.com"
+          curl -sS --fail "https://ankurhalder.onrender.com" || echo "Ping failed."
           echo "Ping complete."
 
       - name: Log inactive state
