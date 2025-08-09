@@ -29,17 +29,17 @@ jobs:
       - name: Activate Pinger
         if: ${{ github.event.inputs.action == 'activate-pinger' }}
         run: |
-          DURATION="${{ github.event.inputs.duration_hours }} hours"
+          HOURS="${{ github.event.inputs.duration_hours }}"
           INTERVAL="${{ github.event.inputs.interval_minutes }}"
-          echo "Activating pinger for $DURATION at a $INTERVAL minute interval..."
-          echo "{\"activeUntil\":\"$(date -u -d \"$DURATION\" -Iseconds)\", \"interval\":\"$INTERVAL\"}" > pinger-state.json
-          echo "COMMIT_MESSAGE=chore: Activate pinger for ${{ github.event.inputs.duration_hours }} hours" >> $GITHUB_ENV
+          DATE_STRING="now + $HOURS hours"
+          echo "Activating pinger for $HOURS hours at a $INTERVAL minute interval..."
+          echo "{\"activeUntil\":\"$(date -u -d "$DATE_STRING" -Iseconds)\", \"interval\":\"$INTERVAL\"}" > pinger-state.json
+          echo "COMMIT_MESSAGE=chore: Activate pinger for $HOURS hours" >> $GITHUB_ENV
 
       - name: Deactivate Pinger
         if: ${{ github.event.inputs.action == 'deactivate-pinger' }}
         run: |
           echo "Deactivating pinger..."
-          # Use the last known interval or a default if the file doesn't exist/is malformed
           INTERVAL=$(jq -r .interval pinger-state.json 2>/dev/null || echo "14")
           echo "{\"activeUntil\":\"$(date -u -d '1 second ago' -Iseconds)\", \"interval\":\"$INTERVAL\"}" > pinger-state.json
           echo "COMMIT_MESSAGE=chore: Deactivate pinger" >> $GITHUB_ENV
